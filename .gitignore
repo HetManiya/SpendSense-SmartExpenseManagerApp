@@ -1,0 +1,13 @@
+# Project exclude paths
+.gradle/
+app/build/
+build/
+*.hprof
+*.log
+local.properties
+.idea/
+*.iml
+*.jks
+*.p12
+*.key
+google-services.json
