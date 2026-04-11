@@ -2,8 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
-    // Removed google-services plugin to allow building without google-services.json
-    // Manual initialization is handled in SpendSenseApplication.kt
+    id("com.google.dagger.hilt.android")
 }
 
 android {
@@ -87,9 +86,15 @@ dependencies {
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
     
-    // Room Encryption (SQLCipher) - Corrected artifact name for 4.6.1+
+    // Room Encryption (SQLCipher)
     implementation("net.zetetic:sqlcipher-android:4.6.1")
     implementation("androidx.sqlite:sqlite-ktx:2.4.0")
+
+    // Hilt
+    val hiltVersion = "2.51.1"
+    implementation("com.google.dagger:hilt-android:$hiltVersion")
+    ksp("com.google.dagger:hilt-android-compiler:$hiltVersion")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:32.7.2"))
@@ -111,6 +116,10 @@ dependencies {
 
     // OpenCSV for Exporting
     implementation("com.opencsv:opencsv:5.9")
+
+    // WorkManager for background tasks
+    val workVersion = "2.9.0"
+    implementation("androidx.work:work-runtime-ktx:$workVersion")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

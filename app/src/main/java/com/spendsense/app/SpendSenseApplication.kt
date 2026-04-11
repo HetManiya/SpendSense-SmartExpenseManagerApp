@@ -1,22 +1,35 @@
 package com.spendsense.app
 
 import android.app.Application
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.*
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
-import net.zetetic.database.sqlcipher.SQLiteDatabase
+import com.spendsense.app.backend.worker.BudgetCheckWorker
+import dagger.hilt.android.HiltAndroidApp
+import java.util.concurrent.TimeUnit
+import javax.inject.Inject
 
-class SpendSenseApplication : Application() {
+@HiltAndroidApp
+class SpendSenseApplication : Application(), Configuration.Provider {
+
+    @Inject
+    lateinit var workerFactory: HiltWorkerFactory
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .build()
+
     override fun onCreate() {
         super.onCreate()
         
-        // 1. Initialize SQLCipher native library (Best practice for sqlcipher-android 4.6.1+)
+        // Load SQLCipher library explicitly
         System.loadLibrary("sqlcipher")
         
-        // 2. Initialize Firebase with a safety check
+        // Initialize Firebase with a safety check
         try {
             if (FirebaseApp.getApps(this).isEmpty()) {
-                // We use manual initialization as a fallback if google-services.json is missing or plugin fails
-                // In a production app, you should ensure google-services.json is correctly placed in /app folder
                 val options = FirebaseOptions.Builder()
                     .setApplicationId("com.spendsense.app")
                     .setApiKey("dummy_api_key")
@@ -27,5 +40,23 @@ class SpendSenseApplication : Application() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+
+        setupBackgroundWorkers()
+    }
+
+    private fun setupBackgroundWorkers() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+            .build()
+
+        val budgetCheckRequest = PeriodicWorkRequestBuilder<BudgetCheckWorker>(4, TimeUnit.HOURS)
+            .setConstraints(constraints)
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "BudgetCheckWork",
+            ExistingPeriodicWorkPolicy.KEEP,
+            budgetCheckRequest
+        )
     }
 }
