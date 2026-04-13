@@ -16,7 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
@@ -24,6 +23,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.spendsense.app.backend.local.ExpenseEntity
+import com.spendsense.app.frontend.components.GlassCard
 import com.spendsense.app.frontend.components.StandardCard
 import com.spendsense.app.frontend.theme.*
 import com.spendsense.app.frontend.viewmodels.MainViewModel
@@ -84,6 +84,7 @@ fun AnalyticsContent(
             .fillMaxSize()
             .background(BackgroundGray)
             .padding(20.dp)
+            .statusBarsPadding()
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -102,7 +103,7 @@ fun AnalyticsContent(
         }
         
         if (showFilters) {
-            StandardCard(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
+            GlassCard(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
                 Text("Category", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
                 var expanded by remember { mutableStateOf(false) }
                 ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
@@ -159,7 +160,7 @@ fun AnalyticsContent(
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
-                StandardCard(modifier = Modifier.fillMaxWidth()) {
+                GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Text("Expenditure Distribution", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(24.dp))
                     
@@ -180,7 +181,7 @@ fun AnalyticsContent(
                             Canvas(modifier = Modifier.size(200.dp)) {
                                 var startAngle = -90f
                                 val total = categoryGroups.sumOf { it.second }.toFloat()
-                                val colors = listOf(PrimaryBlue, AccentGreen, WarningRed, Color(0xFFFFB300), Color(0xFF9C27B0), InfoBlue, Color(0xFF4CAF50), Color(0xFFE91E63))
+                                val colors = listOf(PrimaryBlue, AccentGreen, WarningRed, Color(0xFFFFB300), Color(0xFF9C27B0), Color(0xFF2D62ED), Color(0xFF4CAF50), Color(0xFFE91E63))
                                 
                                 categoryGroups.forEachIndexed { index, pair ->
                                     val sweepAngle = (pair.second.toFloat() / total) * 360f * animationProgress.value
@@ -231,7 +232,7 @@ fun AnalyticsContent(
 
             if (categoryGroups.isNotEmpty()) {
                 item {
-                    StandardCard(modifier = Modifier.fillMaxWidth()) {
+                    GlassCard(modifier = Modifier.fillMaxWidth()) {
                         Text("Top Spending Hubs", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(16.dp))
                         categoryGroups.take(3).forEach { (cat, amt) ->
@@ -245,7 +246,7 @@ fun AnalyticsContent(
             }
 
             item {
-                StandardCard(modifier = Modifier.fillMaxWidth()) {
+                GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Text("System Projection (Next Month)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = AccentGreen)
                     Spacer(modifier = Modifier.height(12.dp))
                     val currentTotal = expenses.sumOf { it.amount }
@@ -287,7 +288,7 @@ fun AnalyticsContent(
 
 @Composable
 fun MetricRow(label: String, value: Double) {
-    StandardCard(
+    GlassCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)

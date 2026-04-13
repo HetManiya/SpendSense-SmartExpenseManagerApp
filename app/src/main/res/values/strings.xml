@@ -1,3 +1,18 @@
 <resources>
     <string name="app_name">SpendSense</string>
+    <string name="good_morning">Good Morning</string>
+    <string name="total_balance">Total Balance</string>
+    <string name="income">Income</string>
+    <string name="expenses">Expenses</string>
+    <string name="daily_limit">Daily Spending Limit</string>
+    <string name="monthly_budget">Monthly Budget</string>
+    <string name="recent_transactions">Recent Transactions</string>
+    <string name="view_all">View All</string>
+    <string name="quick_add_expense">Quick Add Expense</string>
+    <string name="quick_add_income">Quick Add Income</string>
+    <string name="save_now">Save Now</string>
+    <string name="magic_insight">Magic Insight</string>
+    <string name="group_sync">Group Sync</string>
+    <string name="no_transactions">No transactions yet</string>
+    <string name="tap_to_add">Tap + to add your first expense</string>
 </resources>

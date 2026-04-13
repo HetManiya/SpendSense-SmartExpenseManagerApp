@@ -1,11 +1,12 @@
 package com.spendsense.app
 
 import android.os.Bundle
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import com.spendsense.app.frontend.screens.AuthScreen
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import com.spendsense.app.frontend.screens.MainScreen
 import com.spendsense.app.frontend.theme.SpendSenseTheme
 import com.spendsense.app.frontend.viewmodels.MainViewModel
@@ -15,28 +16,22 @@ import androidx.fragment.app.FragmentActivity
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
 
-    private val viewModel: MainViewModel by viewModels()
+    private val mainViewModel: MainViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(
+                Color.Transparent.toArgb(), Color.Transparent.toArgb()
+            ),
+            navigationBarStyle = SystemBarStyle.light(
+                Color.Transparent.toArgb(), Color.Transparent.toArgb()
+            )
+        )
         super.onCreate(savedInstanceState)
         
         setContent {
             SpendSenseTheme {
-                val isAuthenticated by viewModel.isAuthenticated.collectAsState()
-                val isGuest by viewModel.isGuest.collectAsState()
-                
-                if (isAuthenticated || isGuest) {
-                    MainScreen(viewModel = viewModel)
-                } else {
-                    AuthScreen(
-                        onLoginSuccess = { idToken ->
-                            viewModel.signInWithGoogle(idToken)
-                        },
-                        onSkip = {
-                            viewModel.setGuestMode(true)
-                        }
-                    )
-                }
+                MainScreen(viewModel = mainViewModel)
             }
         }
     }

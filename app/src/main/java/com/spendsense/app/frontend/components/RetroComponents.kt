@@ -13,15 +13,6 @@ import com.spendsense.app.frontend.theme.PrimaryBlue
  */
 
 @Composable
-@Deprecated("Use StandardCard instead", ReplaceWith("StandardCard(modifier, content)"))
-fun GlassCard(
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    StandardCard(modifier = modifier, content = content)
-}
-
-@Composable
 @Deprecated("Use PrimaryButton instead", ReplaceWith("PrimaryButton(text, onClick, modifier)"))
 fun GlowButton(
     text: String,

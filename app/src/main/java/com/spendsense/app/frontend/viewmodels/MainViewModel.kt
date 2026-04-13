@@ -18,16 +18,17 @@ import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val repository: FinanceRepository,
-    private val smartInsights: SmartInsightsRepository
+    private val smartInsights: SmartInsightsRepository,
+    private val auth: FirebaseAuth,
+    private val firestore: FirebaseFirestore
 ) : ViewModel() {
 
-    private val auth = FirebaseAuth.getInstance()
-    private val firestore = FirebaseFirestore.getInstance()
     private var firestoreListener: ListenerRegistration? = null
 
     private val _isAuthenticated = MutableStateFlow(auth.currentUser != null)
@@ -35,6 +36,9 @@ class MainViewModel @Inject constructor(
 
     private val _isGuest = MutableStateFlow(false)
     val isGuest: StateFlow<Boolean> = _isGuest
+
+    private val _isAuthLoading = MutableStateFlow(false)
+    val isAuthLoading: StateFlow<Boolean> = _isAuthLoading
 
     private val _groupId = MutableStateFlow<String?>(null)
     val groupId: StateFlow<String?> = _groupId
@@ -93,18 +97,86 @@ class MainViewModel @Inject constructor(
             }
     }
 
-    fun signInWithGoogle(idToken: String) {
+    fun signInWithEmail(email: String, pass: String) {
         viewModelScope.launch {
+            _isAuthLoading.value = true
+            _authError.value = null
             try {
-                val credential = GoogleAuthProvider.getCredential(idToken, null)
-                auth.signInWithCredential(credential).await()
+                auth.signInWithEmailAndPassword(email, pass).await()
                 _isAuthenticated.value = true
                 _isGuest.value = false
                 auth.currentUser?.let { loadUserGroup(it.uid) }
             } catch (e: Exception) {
-                _authError.value = e.message
-                Log.e("Auth", "Google sign in failed", e)
+                _authError.value = e.message ?: "Authentication failed"
+            } finally {
+                _isAuthLoading.value = false
             }
+        }
+    }
+
+    fun signUpWithEmail(email: String, pass: String) {
+        viewModelScope.launch {
+            _isAuthLoading.value = true
+            _authError.value = null
+            try {
+                val result = auth.createUserWithEmailAndPassword(email, pass).await()
+                val userId = result.user?.uid ?: throw Exception("User creation failed")
+                
+                // Initialize Firestore user document
+                val profile = mapOf("name" to "", "currency" to "₹", "budget" to 0.0, "incomeRange" to "Medium")
+                firestore.collection("users").document(userId).set(profile).await()
+                
+                _isAuthenticated.value = true
+                _isGuest.value = false
+            } catch (e: Exception) {
+                _authError.value = e.message ?: "Sign up failed"
+            } finally {
+                _isAuthLoading.value = false
+            }
+        }
+    }
+
+    fun signInWithGoogle(idToken: String) {
+        viewModelScope.launch {
+            _isAuthLoading.value = true
+            _authError.value = null
+            try {
+                val credential = GoogleAuthProvider.getCredential(idToken, null)
+                val result = auth.signInWithCredential(credential).await()
+                val userId = result.user?.uid ?: throw Exception("Google Sign-In failed")
+                
+                // Check if user exists in Firestore, if not initialize
+                val doc = firestore.collection("users").document(userId).get().await()
+                if (!doc.exists()) {
+                    val profile = mapOf("name" to (result.user?.displayName ?: ""), "currency" to "₹", "budget" to 0.0, "incomeRange" to "Medium")
+                    firestore.collection("users").document(userId).set(profile).await()
+                }
+                
+                _isAuthenticated.value = true
+                _isGuest.value = false
+                loadUserGroup(userId)
+            } catch (e: Exception) {
+                _authError.value = e.message ?: "Authentication failed"
+                Log.e("Auth", "Google sign in failed", e)
+            } finally {
+                _isAuthLoading.value = false
+            }
+        }
+    }
+
+    fun clearAuthError() {
+        _authError.value = null
+    }
+
+    fun createGroup() {
+        val userId = auth.currentUser?.uid ?: return
+        val newGroupId = UUID.randomUUID().toString().substring(0, 8).uppercase()
+        viewModelScope.launch {
+            firestore.collection("users").document(userId).update("groupId", newGroupId)
+                .addOnSuccessListener {
+                    _groupId.value = newGroupId
+                    startFirestoreSync(newGroupId)
+                }
         }
     }
 
@@ -119,24 +191,31 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun setAuthenticated(value: Boolean) {
-        _isAuthenticated.value = value
-        _isGuest.value = false
-        if (value) auth.currentUser?.let { loadUserGroup(it.uid) }
-    }
-
-    fun setGuestMode(value: Boolean) {
-        _isGuest.value = value
-        _isAuthenticated.value = false
-        firestoreListener?.remove()
+    fun leaveGroup() {
+        val userId = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            firestore.collection("users").document(userId).update("groupId", null)
+                .addOnSuccessListener {
+                    _groupId.value = null
+                    firestoreListener?.remove()
+                }
+        }
     }
 
     fun logout() {
-        auth.signOut()
-        _isAuthenticated.value = false
-        _isGuest.value = false
-        _groupId.value = null
-        firestoreListener?.remove()
+        viewModelScope.launch {
+            // 1. Sign out from Firebase
+            auth.signOut()
+            
+            // 2. Clear local Room database
+            repository.clearAllData()
+            
+            // 3. Reset View State
+            _isAuthenticated.value = false
+            _isGuest.value = false
+            _groupId.value = null
+            firestoreListener?.remove()
+        }
     }
 
     fun generateAiInsights() {
@@ -198,7 +277,11 @@ class MainViewModel @Inject constructor(
 
     private fun syncIncomeToFirebase(income: IncomeEntity) {
         val targetId = _groupId.value ?: auth.currentUser?.uid ?: return
-        val collectionPath = if (_groupId.value != null) "groups" else "users"
+        val collectionPath = if (_groupId.value != null) {
+            "groups"
+        } else {
+            "users"
+        }
         firestore.collection(collectionPath).document(targetId)
             .collection("incomes").document(income.id.toString()).set(income)
     }

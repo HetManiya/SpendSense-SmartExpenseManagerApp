@@ -25,7 +25,8 @@ fun SplashScreen(navController: NavController, viewModel: MainViewModel) {
     LaunchedEffect(userProfile) {
         delay(2000)
         if (userProfile == null) {
-            navController.navigate(Screen.Onboarding.route) {
+            // Navigate to Auth instead of directly to Onboarding
+            navController.navigate(Screen.Auth.route) {
                 popUpTo(Screen.Splash.route) { inclusive = true }
             }
         } else {

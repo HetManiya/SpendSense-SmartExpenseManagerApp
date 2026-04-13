@@ -15,6 +15,9 @@ interface SpendSenseDao {
     @Delete
     suspend fun deleteExpense(expense: ExpenseEntity)
 
+    @Query("DELETE FROM expenses")
+    suspend fun deleteAllExpenses()
+
     @Query("SELECT * FROM expenses ORDER BY date DESC")
     fun getAllExpenses(): Flow<List<ExpenseEntity>>
 
@@ -28,6 +31,9 @@ interface SpendSenseDao {
     @Delete
     suspend fun deleteIncome(income: IncomeEntity)
 
+    @Query("DELETE FROM incomes")
+    suspend fun deleteAllIncomes()
+
     @Query("SELECT * FROM incomes ORDER BY date DESC")
     fun getAllIncomes(): Flow<List<IncomeEntity>>
 
@@ -35,12 +41,18 @@ interface SpendSenseDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBudget(budget: BudgetEntity)
 
+    @Query("DELETE FROM budgets")
+    suspend fun deleteAllBudgets()
+
     @Query("SELECT * FROM budgets WHERE month = :month LIMIT 1")
     fun getBudgetForMonth(month: String): Flow<BudgetEntity?>
 
     // User
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUser(user: UserEntity)
+
+    @Query("DELETE FROM users")
+    suspend fun deleteUser()
 
     @Query("SELECT * FROM users WHERE id = 1")
     fun getUserProfile(): Flow<UserEntity?>
@@ -54,4 +66,7 @@ interface SpendSenseDao {
 
     @Delete
     suspend fun deleteGoal(goal: GoalEntity)
+
+    @Query("DELETE FROM goals")
+    suspend fun deleteAllGoals()
 }

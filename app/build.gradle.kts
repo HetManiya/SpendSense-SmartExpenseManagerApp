@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -20,10 +21,13 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"394951768057-87s8g7209cdfbphldtmj1gmjl5godrdh.apps.googleusercontent.com\"")
     }
 
     buildTypes {
         debug {
+            buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"394951768057-87s8g7209cdfbphldtmj1gmjl5godrdh.apps.googleusercontent.com\"")
             packaging {
                 jniLibs {
                     useLegacyPackaging = true
@@ -50,6 +54,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
@@ -95,6 +100,10 @@ dependencies {
     implementation("com.google.dagger:hilt-android:$hiltVersion")
     ksp("com.google.dagger:hilt-android-compiler:$hiltVersion")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    
+    // Hilt WorkManager
+    implementation("androidx.hilt:hilt-work:1.2.0")
+    ksp("androidx.hilt:hilt-compiler:1.2.0")
 
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:32.7.2"))

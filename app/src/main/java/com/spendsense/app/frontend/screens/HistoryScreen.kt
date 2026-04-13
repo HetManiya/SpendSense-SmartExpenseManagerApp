@@ -7,11 +7,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,8 +21,11 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.spendsense.app.backend.local.ExpenseEntity
 import com.spendsense.app.backend.local.IncomeEntity
+import com.spendsense.app.frontend.components.GlassCard
 import com.spendsense.app.frontend.theme.*
 import com.spendsense.app.frontend.viewmodels.MainViewModel
+import java.text.SimpleDateFormat
+import java.util.*
 
 sealed class Transaction {
     abstract val id: Int
@@ -111,10 +111,10 @@ fun HistoryContent(
     Scaffold(
         containerColor = BackgroundGray,
         topBar = {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.statusBarsPadding().padding(24.dp)) {
                 Text(
-                    text = "Transaction History",
-                    style = MaterialTheme.typography.headlineMedium,
+                    text = "History",
+                    style = MaterialTheme.typography.headlineLarge,
                     color = TextPrimary,
                     fontWeight = FontWeight.Bold
                 )
@@ -123,20 +123,18 @@ fun HistoryContent(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = onSearchChange,
-                    placeholder = { Text("Search transactions...", color = TextSecondary) },
+                    placeholder = { Text("Search history...", color = TextSecondary) },
                     modifier = Modifier.fillMaxWidth(),
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = PrimaryBlue) },
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(20.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = PrimaryBlue,
                         unfocusedBorderColor = DividerGray,
-                        cursorColor = PrimaryBlue,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
+                        cursorColor = PrimaryBlue
                     )
                 )
                 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("ALL", "EXPENSE", "INCOME").forEach { type ->
@@ -144,10 +142,16 @@ fun HistoryContent(
                             selected = selectedType == type,
                             onClick = { onTypeChange(type) },
                             label = { Text(type, style = MaterialTheme.typography.labelSmall) },
+                            shape = RoundedCornerShape(12.dp),
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = PrimaryBlue.copy(alpha = 0.1f),
-                                selectedLabelColor = PrimaryBlue,
+                                selectedContainerColor = PrimaryBlue,
+                                selectedLabelColor = Color.White,
                                 labelColor = TextSecondary
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = selectedType == type,
+                                borderColor = if (selectedType == type) Color.Transparent else DividerGray
                             )
                         )
                     }
@@ -159,35 +163,50 @@ fun HistoryContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(transactions) { transaction ->
-                TransactionCard(transaction, currency, onDelete, onEdit)
+            if (transactions.isEmpty()) {
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = 100.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Rounded.History, contentDescription = null, modifier = Modifier.size(64.dp), tint = DividerGray)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("No matching records", color = TextSecondary)
+                    }
+                }
+            } else {
+                items(transactions) { transaction ->
+                    TransactionItem(transaction, currency, onDelete, onEdit)
+                }
             }
-            item { Spacer(modifier = Modifier.height(80.dp)) }
+            item { Spacer(modifier = Modifier.height(100.dp)) }
         }
     }
 }
 
 @Composable
-fun TransactionCard(
+fun TransactionItem(
     transaction: Transaction,
     currency: String,
     onDelete: (Transaction) -> Unit,
     onEdit: (Transaction) -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
+    val isExpense = transaction is Transaction.Expense
+    val tintColor = if (isExpense) WarningRed else AccentGreen
 
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             containerColor = SurfaceWhite,
-            title = { Text("Delete Transaction?", color = WarningRed, style = MaterialTheme.typography.titleLarge) },
-            text = { Text("Are you sure you want to delete this record? This action cannot be undone.", color = TextPrimary) },
+            title = { Text("Delete Entry?", fontWeight = FontWeight.Bold) },
+            text = { Text("This will permanently remove this record from your history.") },
             confirmButton = {
                 TextButton(onClick = { onDelete(transaction); showDeleteDialog = false }) {
-                    Text("Delete", color = WarningRed)
+                    Text("Delete", color = WarningRed, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -195,85 +214,64 @@ fun TransactionCard(
                     Text("Cancel", color = TextSecondary)
                 }
             },
-            shape = RoundedCornerShape(24.dp)
+            shape = RoundedCornerShape(28.dp)
         )
     }
 
-    Surface(
+    GlassCard(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onEdit(transaction) },
-        shape = RoundedCornerShape(24.dp),
-        color = SurfaceWhite
+            .clickable { onEdit(transaction) }
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val isExpense = transaction is Transaction.Expense
-            val tintColor = if (isExpense) WarningRed else AccentGreen
-            
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
                     .background(tintColor.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = if (isExpense) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
+                    imageVector = if (isExpense) Icons.Rounded.NorthEast else Icons.Rounded.SouthWest,
                     contentDescription = null,
                     tint = tintColor,
                     modifier = Modifier.size(20.dp)
                 )
             }
+            
             Spacer(modifier = Modifier.width(16.dp))
+            
             Column(modifier = Modifier.weight(1f)) {
-                Text(transaction.title, style = MaterialTheme.typography.titleMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
-                if (transaction.note.isNotBlank()) {
-                    Text(transaction.note, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-                }
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                val prefix = if (isExpense) "-" else "+"
                 Text(
-                    text = "$prefix$currency${String.format("%.2f", transaction.amount)}",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = tintColor,
+                    text = transaction.title, 
+                    style = MaterialTheme.typography.titleMedium, 
+                    color = TextPrimary, 
                     fontWeight = FontWeight.Bold
                 )
-                Row {
-                    if (isExpense) {
-                        IconButton(onClick = { onEdit(transaction) }, modifier = Modifier.size(24.dp)) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextSecondary.copy(alpha = 0.6f))
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
+                Text(
+                    text = SimpleDateFormat("MMM dd, hh:mm a", Locale.getDefault()).format(Date(transaction.date)), 
+                    style = MaterialTheme.typography.labelSmall, 
+                    color = TextSecondary
+                )
+            }
+            
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = (if (isExpense) "-" else "+") + currency + String.format("%.2f", transaction.amount),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = tintColor,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                
+                Row(modifier = Modifier.padding(top = 4.dp)) {
                     IconButton(onClick = { showDeleteDialog = true }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = TextSecondary.copy(alpha = 0.4f))
+                        Icon(Icons.Rounded.DeleteOutline, contentDescription = "Delete", tint = TextSecondary.copy(alpha = 0.4f), modifier = Modifier.size(18.dp))
                     }
                 }
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun HistoryScreenPreview() {
-    SpendSenseTheme {
-        HistoryContent(
-            transactions = listOf(
-                Transaction.Expense(ExpenseEntity(1, 150.0, "Shopping", System.currentTimeMillis(), "New Boots", "Card")),
-                Transaction.Income(IncomeEntity(2, 5000.0, System.currentTimeMillis(), "Salary", "Monthly Pay"))
-            ),
-            currency = "₹",
-            searchQuery = "",
-            selectedType = "ALL",
-            onSearchChange = {},
-            onTypeChange = {},
-            onDelete = {},
-            onEdit = {}
-        )
     }
 }

@@ -1,6 +1,8 @@
 package com.spendsense.app.core.di
 
 import android.content.Context
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.spendsense.app.backend.local.SpendSenseDao
 import com.spendsense.app.backend.local.SpendSenseDatabase
 import com.spendsense.app.backend.repository.FinanceRepository
@@ -37,5 +39,17 @@ object AppModule {
     @Singleton
     fun provideSmartInsightsRepository(): SmartInsightsRepository {
         return SmartInsightsRepository()
+    }
+
+    @Provides
+    @Singleton
+    fun provideFirebaseAuth(): FirebaseAuth {
+        return FirebaseAuth.getInstance()
+    }
+
+    @Provides
+    @Singleton
+    fun provideFirebaseFirestore(): FirebaseFirestore {
+        return FirebaseFirestore.getInstance()
     }
 }

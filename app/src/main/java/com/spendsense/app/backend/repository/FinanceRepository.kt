@@ -23,4 +23,13 @@ class FinanceRepository(private val dao: SpendSenseDao) {
     // Goals
     suspend fun addGoal(goal: GoalEntity) = dao.insertGoal(goal)
     suspend fun deleteGoal(goal: GoalEntity) = dao.deleteGoal(goal)
+
+    // Clear all local data on logout
+    suspend fun clearAllData() {
+        dao.deleteAllExpenses()
+        dao.deleteAllIncomes()
+        dao.deleteAllBudgets()
+        dao.deleteAllGoals()
+        dao.deleteUser()
+    }
 }

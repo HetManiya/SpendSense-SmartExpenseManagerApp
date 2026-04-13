@@ -2,21 +2,17 @@ package com.spendsense.app.frontend.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Primary Brand Colors
-val PrimaryBlue = Color(0xFF0056D2)
-val PrimaryVariant = Color(0xFFE8F1FF)
-
-// Status Colors
-val AccentGreen = Color(0xFF2E7D32)
-val WarningRed = Color(0xFFD32F2F)
-val InfoBlue = Color(0xFF0288D1)
-
-// Neutral Palette
-val BackgroundGray = Color(0xFFF8F9FA)
+val PrimaryBlue = Color(0xFF2D62ED)
+val PrimaryVariant = Color(0xFFE8EFFF)
+val BackgroundGray = Color(0xFFF8F9FE)
 val SurfaceWhite = Color(0xFFFFFFFF)
 val TextPrimary = Color(0xFF1A1C1E)
-val TextSecondary = Color(0xFF44474E)
-val DividerGray = Color(0xFFC4C7CF)
+val TextSecondary = Color(0xFF6C727A)
+val AccentGreen = Color(0xFF34C759)
+val WarningRed = Color(0xFFFF3B30)
+val DividerGray = Color(0xFFEDF1F5)
 
-// Elevation/Shadow
-val ShadowColor = Color(0x1A000000)
+// Dark Theme Colors (Optional but good for M3)
+val PrimaryBlueDark = Color(0xFFB0C5FF)
+val BackgroundDark = Color(0xFF1A1C1E)
+val SurfaceDark = Color(0xFF2F3033)
