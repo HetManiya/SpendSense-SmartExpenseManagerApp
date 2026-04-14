@@ -1,8 +1,8 @@
 package com.spendsense.app.frontend.viewmodels
 
+import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
@@ -22,12 +22,12 @@ import javax.inject.Inject
 class FinanceViewModel @Inject constructor(
     private val repository: FinanceRepository,
     private val smartInsights: SmartInsightsRepository,
-    private val auth: FirebaseAuth,
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val sharedPrefs: SharedPreferences
 ) : ViewModel() {
 
     private var firestoreListener: ListenerRegistration? = null
-    private val _groupId = MutableStateFlow<String?>(null)
+    private val _groupId = MutableStateFlow<String?>(sharedPrefs.getString("group_id", null))
 
     val allExpenses = repository.allExpenses.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
     val allIncomes = repository.allIncomes.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -41,8 +41,6 @@ class FinanceViewModel @Inject constructor(
         val totalIncome = incomes.filter { SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date(it.date)) == month }.sumOf { it.amount }
         val balance = totalIncome - totalExpense
         
-        // This is a bit tricky since getBudgetForMonth is a Flow. 
-        // For simplicity in this split, we'll keep it as is or improve the repository.
         DashboardState(
             totalIncome = totalIncome,
             totalExpense = totalExpense,
@@ -72,7 +70,8 @@ class FinanceViewModel @Inject constructor(
     }
 
     private fun syncExpenseToFirebase(expense: ExpenseEntity) {
-        val targetId = _groupId.value ?: auth.currentUser?.uid ?: return
+        val userId = sharedPrefs.getString("user_id", null) ?: return
+        val targetId = _groupId.value ?: userId
         val collectionPath = if (_groupId.value != null) "groups" else "users"
         firestore.collection(collectionPath).document(targetId)
             .collection("expenses").document(expense.id.toString()).set(expense)
@@ -80,7 +79,8 @@ class FinanceViewModel @Inject constructor(
 
     fun startSync(groupId: String?) {
         _groupId.value = groupId
-        val targetId = groupId ?: auth.currentUser?.uid ?: return
+        val userId = sharedPrefs.getString("user_id", null) ?: return
+        val targetId = groupId ?: userId
         val collectionPath = if (groupId != null) "groups" else "users"
         
         firestoreListener?.remove()

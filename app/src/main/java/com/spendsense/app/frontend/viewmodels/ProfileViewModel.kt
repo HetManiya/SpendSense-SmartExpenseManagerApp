@@ -1,8 +1,8 @@
 package com.spendsense.app.frontend.viewmodels
 
+import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.spendsense.app.backend.local.BudgetEntity
 import com.spendsense.app.backend.local.UserEntity
@@ -18,8 +18,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val repository: FinanceRepository,
-    private val auth: FirebaseAuth,
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val sharedPrefs: SharedPreferences
 ) : ViewModel() {
 
     val userProfile = repository.userProfile.stateIn(viewModelScope, SharingStarted.Lazily, null)
@@ -31,7 +31,7 @@ class ProfileViewModel @Inject constructor(
             repository.setBudget(BudgetEntity(month = currentMonthYear, limitAmount = budgetLimit))
             
             if (!isGuest) {
-                val userId = auth.currentUser?.uid ?: return@launch
+                val userId = sharedPrefs.getString("user_id", null) ?: return@launch
                 val profile = mapOf("name" to name, "currency" to currency, "budget" to budgetLimit)
                 firestore.collection("users").document(userId).set(profile, com.google.firebase.firestore.SetOptions.merge())
             }
@@ -39,12 +39,10 @@ class ProfileViewModel @Inject constructor(
     }
     
     fun migrateGuestDataToFirebase(onComplete: () -> Unit) {
-        // Implementation for Suggestion #7
         viewModelScope.launch {
-            val userId = auth.currentUser?.uid ?: return@launch
-            // 1. Get all local data
-            // 2. Upload to Firestore
-            // 3. onComplete()
+            val userId = sharedPrefs.getString("user_id", null) ?: return@launch
+            // Future logic for guest to cloud migration
+            onComplete()
         }
     }
 }

@@ -17,7 +17,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.spendsense.app.frontend.theme.SpendSenseTheme
 import com.spendsense.app.frontend.viewmodels.AuthViewModel
 import com.spendsense.app.frontend.viewmodels.MainViewModel
 import com.spendsense.app.frontend.viewmodels.OnboardingViewModel
@@ -55,6 +54,7 @@ fun SpendSenseNavHost(
                 navController = navController,
                 viewModel = mainViewModel,
                 onSkip = {
+                    mainViewModel.setGuestMode(true)
                     navController.navigate(Screen.Onboarding.route) {
                         popUpTo(Screen.Auth.route) { inclusive = true }
                     }

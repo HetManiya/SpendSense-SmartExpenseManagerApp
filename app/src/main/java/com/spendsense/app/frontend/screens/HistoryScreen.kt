@@ -1,10 +1,13 @@
 package com.spendsense.app.frontend.screens
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -14,10 +17,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.spendsense.app.backend.local.ExpenseEntity
 import com.spendsense.app.backend.local.IncomeEntity
@@ -92,7 +97,8 @@ fun HistoryScreen(navController: NavController, viewModel: MainViewModel) {
             if (transaction is Transaction.Expense) {
                 navController.navigate(Screen.AddEntry.createRoute(transaction.id))
             }
-        }
+        },
+        onBack = { navController.popBackStack() }
     )
 }
 
@@ -106,83 +112,140 @@ fun HistoryContent(
     onSearchChange: (String) -> Unit,
     onTypeChange: (String) -> Unit,
     onDelete: (Transaction) -> Unit,
-    onEdit: (Transaction) -> Unit
+    onEdit: (Transaction) -> Unit,
+    onBack: () -> Unit
 ) {
     Scaffold(
         containerColor = BackgroundGray,
         topBar = {
-            Column(modifier = Modifier.statusBarsPadding().padding(24.dp)) {
-                Text(
-                    text = "History",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = TextPrimary,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(16.dp))
+            Column(
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .background(Color.Transparent)
+                    .padding(horizontal = 24.dp, vertical = 12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.clip(CircleShape).background(Color.White).size(44.dp)
+                    ) {
+                        Icon(Icons.Rounded.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                    }
+                    Text(
+                        text = "History",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Box(modifier = Modifier.size(44.dp)) // Spacer
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
                 
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = onSearchChange,
-                    placeholder = { Text("Search history...", color = TextSecondary) },
-                    modifier = Modifier.fillMaxWidth(),
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = PrimaryBlue) },
+                    placeholder = { Text("Search transactions...", color = TextSecondary.copy(alpha = 0.5f)) },
+                    modifier = Modifier.fillMaxWidth().shadow(8.dp, RoundedCornerShape(20.dp), spotColor = Color.Black.copy(alpha = 0.1f)),
+                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, tint = PrimaryBlue) },
                     shape = RoundedCornerShape(20.dp),
+                    singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
                         focusedBorderColor = PrimaryBlue,
-                        unfocusedBorderColor = DividerGray,
+                        unfocusedBorderColor = Color.Transparent,
                         cursorColor = PrimaryBlue
                     )
                 )
                 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(20.dp))
                 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     listOf("ALL", "EXPENSE", "INCOME").forEach { type ->
-                        FilterChip(
-                            selected = selectedType == type,
+                        val isSelected = selectedType == type
+                        Surface(
                             onClick = { onTypeChange(type) },
-                            label = { Text(type, style = MaterialTheme.typography.labelSmall) },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = PrimaryBlue,
-                                selectedLabelColor = Color.White,
-                                labelColor = TextSecondary
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = selectedType == type,
-                                borderColor = if (selectedType == type) Color.Transparent else DividerGray
-                            )
-                        )
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (isSelected) PrimaryBlue else Color.White,
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            shadowElevation = if (isSelected) 4.dp else 0.dp
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = type, 
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) Color.White else TextSecondary
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            if (transactions.isEmpty()) {
-                item {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(top = 100.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(Icons.Rounded.History, contentDescription = null, modifier = Modifier.size(64.dp), tint = DividerGray)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("No matching records", color = TextSecondary)
+        Box(modifier = Modifier.fillMaxSize().background(
+            brush = Brush.verticalGradient(
+                colors = listOf(BackgroundGray, SurfaceWhite)
+            )
+        )) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (transactions.isEmpty()) {
+                    item {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(top = 80.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Surface(
+                                modifier = Modifier.size(100.dp),
+                                shape = CircleShape,
+                                color = BackgroundGray
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Rounded.SearchOff, contentDescription = null, modifier = Modifier.size(48.dp), tint = DividerGray)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Text("No records found", style = MaterialTheme.typography.titleMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
+                            Text("Try adjusting your search or filters", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                        }
+                    }
+                } else {
+                    val grouped = transactions.groupBy { 
+                        SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(Date(it.date))
+                    }
+                    
+                    grouped.forEach { (month, txs) ->
+                        item {
+                            Text(
+                                text = month,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = PrimaryBlue,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                            )
+                        }
+                        items(txs) { transaction ->
+                            TransactionItem(transaction, currency, onDelete, onEdit)
+                        }
                     }
                 }
-            } else {
-                items(transactions) { transaction ->
-                    TransactionItem(transaction, currency, onDelete, onEdit)
-                }
+                item { Spacer(modifier = Modifier.height(100.dp)) }
             }
-            item { Spacer(modifier = Modifier.height(100.dp)) }
         }
     }
 }
@@ -201,12 +264,16 @@ fun TransactionItem(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            containerColor = SurfaceWhite,
-            title = { Text("Delete Entry?", fontWeight = FontWeight.Bold) },
+            containerColor = Color.White,
+            title = { Text("Delete Entry?", fontWeight = FontWeight.ExtraBold) },
             text = { Text("This will permanently remove this record from your history.") },
             confirmButton = {
-                TextButton(onClick = { onDelete(transaction); showDeleteDialog = false }) {
-                    Text("Delete", color = WarningRed, fontWeight = FontWeight.Bold)
+                Button(
+                    onClick = { onDelete(transaction); showDeleteDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = WarningRed),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Delete", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -218,28 +285,39 @@ fun TransactionItem(
         )
     }
 
-    GlassCard(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onEdit(transaction) }
+            .shadow(4.dp, RoundedCornerShape(24.dp), spotColor = Color.Black.copy(alpha = 0.05f)),
+        shape = RoundedCornerShape(24.dp),
+        color = Color.White
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(tintColor.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
+            Surface(
+                modifier = Modifier.size(52.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = tintColor.copy(alpha = 0.1f)
             ) {
-                Icon(
-                    imageVector = if (isExpense) Icons.Rounded.NorthEast else Icons.Rounded.SouthWest,
-                    contentDescription = null,
-                    tint = tintColor,
-                    modifier = Modifier.size(20.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = when(transaction.title) {
+                            "Food" -> Icons.Rounded.Restaurant
+                            "Shopping" -> Icons.Rounded.ShoppingCart
+                            "Travel" -> Icons.Rounded.DirectionsBus
+                            "Rent" -> Icons.Rounded.Home
+                            "Health" -> Icons.Rounded.HealthAndSafety
+                            "Salary" -> Icons.Rounded.AccountBalance
+                            else -> if (isExpense) Icons.Rounded.Payments else Icons.Rounded.Savings
+                        },
+                        contentDescription = null,
+                        tint = tintColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
             
             Spacer(modifier = Modifier.width(16.dp))
@@ -247,12 +325,12 @@ fun TransactionItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = transaction.title, 
-                    style = MaterialTheme.typography.titleMedium, 
+                    style = MaterialTheme.typography.bodyLarge, 
                     color = TextPrimary, 
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = SimpleDateFormat("MMM dd, hh:mm a", Locale.getDefault()).format(Date(transaction.date)), 
+                    text = SimpleDateFormat("MMM dd • hh:mm a", Locale.getDefault()).format(Date(transaction.date)), 
                     style = MaterialTheme.typography.labelSmall, 
                     color = TextSecondary
                 )
@@ -260,16 +338,18 @@ fun TransactionItem(
             
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = (if (isExpense) "-" else "+") + currency + String.format("%.2f", transaction.amount),
+                    text = (if (isExpense) "-" else "+") + currency + String.format("%.0f", transaction.amount),
                     style = MaterialTheme.typography.titleLarge,
                     color = tintColor,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.5).sp
                 )
                 
-                Row(modifier = Modifier.padding(top = 4.dp)) {
-                    IconButton(onClick = { showDeleteDialog = true }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Rounded.DeleteOutline, contentDescription = "Delete", tint = TextSecondary.copy(alpha = 0.4f), modifier = Modifier.size(18.dp))
-                    }
+                IconButton(
+                    onClick = { showDeleteDialog = true }, 
+                    modifier = Modifier.size(32.dp).padding(top = 4.dp)
+                ) {
+                    Icon(Icons.Rounded.DeleteOutline, contentDescription = "Delete", tint = TextSecondary.copy(alpha = 0.3f), modifier = Modifier.size(18.dp))
                 }
             }
         }
