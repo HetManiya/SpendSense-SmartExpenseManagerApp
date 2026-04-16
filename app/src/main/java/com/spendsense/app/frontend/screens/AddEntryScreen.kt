@@ -2,6 +2,7 @@ package com.spendsense.app.frontend.screens
 
 import android.content.Context
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -14,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -49,10 +51,12 @@ import java.util.Objects
 fun AddEntryScreen(navController: NavController, viewModel: MainViewModel, expenseId: Int = -1) {
     val expenses by viewModel.allExpenses.collectAsState()
     val existingExpense = if (expenseId != -1) expenses.find { it.id == expenseId } else null
+    val userProfile by viewModel.userProfile.collectAsState()
+    val currency = userProfile?.currencySymbol ?: "₹"
 
     AddEntryContent(
         existingExpense = existingExpense,
-        viewModel = viewModel,
+        currency = currency,
         onSaveExpense = { amt, cat, note, pay -> 
             viewModel.addOrUpdateExpense(
                 id = existingExpense?.id ?: 0,
@@ -80,13 +84,13 @@ fun AddEntryScreen(navController: NavController, viewModel: MainViewModel, expen
 @Composable
 fun AddEntryContent(
     existingExpense: ExpenseEntity? = null,
-    viewModel: MainViewModel,
+    currency: String,
     onSaveExpense: (Double, String, String, String) -> Unit,
     onSaveIncome: (Double, String, String) -> Unit,
     onBack: () -> Unit
 ) {
     var isExpense by remember { mutableStateOf(existingExpense != null || true) }
-    var amount by remember { mutableStateOf(existingExpense?.amount?.toInt()?.toString() ?: "") }
+    var amount by remember { mutableStateOf(existingExpense?.amount?.toString() ?: "") }
     var note by remember { mutableStateOf(existingExpense?.note ?: "") }
     var selectedCategory by remember { mutableStateOf(existingExpense?.category ?: "Food") }
     var selectedPayment by remember { mutableStateOf(existingExpense?.paymentMethod ?: "Cash") }
@@ -104,17 +108,36 @@ fun AddEntryContent(
             val image = InputImage.fromFilePath(context, uri)
             recognizer.process(image)
                 .addOnSuccessListener { visionText ->
+                    // Improved OCR Regex: Looks for decimal numbers, filters out common date patterns
                     val priceRegex = Regex("""\d{1,3}(?:[.,]\d{3})*[.,]\d{2}""")
-                    val matches = priceRegex.findAll(visionText.text)
+                    val dateRegex = Regex("""\d{2,4}[./-]\d{2}[./-]\d{2,4}""")
+                    
+                    val filteredText = visionText.text.split("\n")
+                        .filter { !dateRegex.containsMatchIn(it) }
+                        .joinToString(" ")
+
+                    val matches = priceRegex.findAll(filteredText)
                         .map { it.value.replace(",", "") }
                         .mapNotNull { it.toDoubleOrNull() }
                         .toList()
                     
-                    if (matches.isNotEmpty()) amount = matches.maxOrNull()?.toInt()?.toString() ?: ""
+                    if (matches.isNotEmpty()) {
+                        val detectedAmount = matches.maxOrNull() ?: 0.0
+                        amount = detectedAmount.toString()
+                        Toast.makeText(context, "Amount detected: $currency$amount", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "No amount detected. Please enter manually.", Toast.LENGTH_LONG).show()
+                    }
                     isProcessing = false
                 }
-                .addOnFailureListener { isProcessing = false }
-        } catch (e: Exception) { isProcessing = false }
+                .addOnFailureListener { 
+                    Toast.makeText(context, "Scan failed: ${it.message}", Toast.LENGTH_LONG).show()
+                    isProcessing = false 
+                }
+        } catch (e: Exception) { 
+            Toast.makeText(context, "Error processing image", Toast.LENGTH_SHORT).show()
+            isProcessing = false 
+        }
     }
 
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
@@ -141,7 +164,7 @@ fun AddEntryContent(
                         onClick = onBack,
                         modifier = Modifier.clip(CircleShape).background(Color.White).size(44.dp)
                     ) {
-                        Icon(Icons.Rounded.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
                     Text(
                         text = if (existingExpense != null) "Edit Transaction" else "Add Transaction",
@@ -210,7 +233,7 @@ fun AddEntryContent(
                         Spacer(modifier = Modifier.height(16.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "₹",
+                                text = currency,
                                 style = MaterialTheme.typography.displayLarge,
                                 color = themeColor.copy(alpha = 0.3f),
                                 fontWeight = FontWeight.Bold
@@ -291,6 +314,8 @@ fun AddEntryContent(
                         if (amt > 0) {
                             if (isExpense) onSaveExpense(amt, selectedCategory, note, selectedPayment)
                             else onSaveIncome(amt, selectedCategory, note)
+                        } else {
+                            Toast.makeText(context, "Please enter a valid amount", Toast.LENGTH_SHORT).show()
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(64.dp),

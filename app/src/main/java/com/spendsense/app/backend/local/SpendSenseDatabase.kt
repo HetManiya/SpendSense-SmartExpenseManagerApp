@@ -1,6 +1,7 @@
 package com.spendsense.app.backend.local
 
 import android.content.Context
+import android.util.Log
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -24,20 +25,48 @@ abstract class SpendSenseDatabase : RoomDatabase() {
     companion object {
         @Volatile
         private var INSTANCE: SpendSenseDatabase? = null
+        private const val DB_NAME = "spendsense_db"
 
         fun getDatabase(context: Context): SpendSenseDatabase {
-            return INSTANCE ?: synchronized(this) {
+            val tempInstance = INSTANCE
+            if (tempInstance != null) {
+                return tempInstance
+            }
+
+            return synchronized(this) {
                 val passphrase = SecurityUtils.getDatabasePassphrase(context)
                 val factory = SupportOpenHelperFactory(passphrase)
 
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     SpendSenseDatabase::class.java,
-                    "spendsense_db"
+                    DB_NAME
                 )
                 .openHelperFactory(factory)
                 .fallbackToDestructiveMigration()
                 .build()
+
+                // Crucial: SQLCipher validation
+                try {
+                    // Try to perform a simple query to verify the key
+                    instance.openHelper.writableDatabase
+                } catch (e: Exception) {
+                    Log.e("SpendSenseDatabase", "Encryption key mismatch or corruption. Recreating database.", e)
+                    instance.close()
+                    context.deleteDatabase(DB_NAME)
+                    // Re-attempt creation (one level of recursion)
+                    val recoveredInstance = Room.databaseBuilder(
+                        context.applicationContext,
+                        SpendSenseDatabase::class.java,
+                        DB_NAME
+                    )
+                    .openHelperFactory(factory)
+                    .fallbackToDestructiveMigration()
+                    .build()
+                    
+                    INSTANCE = recoveredInstance
+                    return@synchronized recoveredInstance
+                }
 
                 INSTANCE = instance
                 instance

@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -46,7 +48,7 @@ fun GroupSettingsScreen(navController: NavController, viewModel: MainViewModel) 
                         onClick = { navController.popBackStack() },
                         modifier = Modifier.clip(CircleShape).background(Color.White).size(44.dp)
                     ) {
-                        Icon(Icons.Rounded.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
                     Text(
                         text = "Cloud Groups",
@@ -209,7 +211,7 @@ fun GroupSettingsScreen(navController: NavController, viewModel: MainViewModel) 
                         modifier = Modifier.padding(bottom = 32.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Rounded.ExitToApp, contentDescription = null, tint = WarningRed, modifier = Modifier.size(20.dp))
+                            Icon(Icons.AutoMirrored.Rounded.ExitToApp, contentDescription = null, tint = WarningRed, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Disconnect from Group", color = WarningRed, fontWeight = FontWeight.Bold)
                         }

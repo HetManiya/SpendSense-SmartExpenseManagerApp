@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -99,7 +100,7 @@ fun AnalyticsContent(
                         onClick = onBack,
                         modifier = Modifier.clip(CircleShape).background(Color.White).size(44.dp)
                     ) {
-                        Icon(Icons.Rounded.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
                     Text(
                         text = "Analytics",
@@ -367,7 +368,7 @@ fun CategoryMetricRowModern(label: String, value: Double, total: Double) {
             }
             Spacer(modifier = Modifier.height(16.dp))
             LinearProgressIndicator(
-                progress = percentage,
+                progress = { percentage },
                 modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
                 color = PrimaryBlue,
                 trackColor = DividerGray.copy(alpha = 0.3f)

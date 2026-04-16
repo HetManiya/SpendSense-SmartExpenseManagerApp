@@ -58,7 +58,6 @@ fun AuthScreen(
     onSkip: () -> Unit
 ) {
     val context = LocalContext.current
-    val focusManager = LocalFocusManager.current
     val isAuthLoading by viewModel.isAuthLoading.collectAsState()
     val authError by viewModel.authError.collectAsState()
     val isAuthenticated by viewModel.isAuthenticated.collectAsState()
@@ -95,6 +94,7 @@ fun AuthScreen(
     }
 
     val gso = remember {
+        @Suppress("DEPRECATION")
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestEmail()
             .requestIdToken(BuildConfig.GOOGLE_WEB_CLIENT_ID)

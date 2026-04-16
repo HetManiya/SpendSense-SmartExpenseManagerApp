@@ -4,6 +4,9 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
@@ -13,6 +16,7 @@ import com.spendsense.app.backend.repository.SmartInsightsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -24,13 +28,12 @@ class MainViewModel @Inject constructor(
     private val repository: FinanceRepository,
     private val smartInsights: SmartInsightsRepository,
     private val firestore: FirebaseFirestore,
+    private val auth: FirebaseAuth,
     private val sharedPrefs: SharedPreferences
 ) : ViewModel() {
 
-    private var firestoreListener: ListenerRegistration? = null
-
-    private val _isAuthenticated = MutableStateFlow(sharedPrefs.getBoolean("is_logged_in", false))
-    val isAuthenticated: StateFlow<Boolean> = _isAuthenticated
+    private var expensesListener: ListenerRegistration? = null
+    private var incomesListener: ListenerRegistration? = null
 
     private val _isGuest = MutableStateFlow(sharedPrefs.getBoolean("is_guest", false))
     val isGuest: StateFlow<Boolean> = _isGuest
@@ -38,11 +41,17 @@ class MainViewModel @Inject constructor(
     private val _isAuthLoading = MutableStateFlow(false)
     val isAuthLoading: StateFlow<Boolean> = _isAuthLoading
 
-    private val _groupId = MutableStateFlow<String?>(sharedPrefs.getString("group_id", null))
-    val groupId: StateFlow<String?> = _groupId
-
     private val _authError = MutableStateFlow<String?>(null)
     val authError: StateFlow<String?> = _authError
+
+    private val _firebaseUser = MutableStateFlow(auth.currentUser)
+
+    val isAuthenticated = combine(_isGuest, _firebaseUser) { guest, user ->
+        guest || user != null
+    }.stateIn(viewModelScope, SharingStarted.Lazily, sharedPrefs.getBoolean("is_guest", false) || auth.currentUser != null)
+
+    private val _groupId = MutableStateFlow<String?>(sharedPrefs.getString("group_id", null))
+    val groupId: StateFlow<String?> = _groupId
 
     val allExpenses = repository.allExpenses.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
     val allIncomes = repository.allIncomes.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -73,9 +82,9 @@ class MainViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.Lazily, DashboardState())
 
     init {
-        val uid = sharedPrefs.getString("user_id", null)
-        if (uid != null) {
-            loadUserGroup(uid)
+        auth.addAuthStateListener { firebaseAuth ->
+            _firebaseUser.value = firebaseAuth.currentUser
+            firebaseAuth.currentUser?.uid?.let { uid -> loadUserGroup(uid) }
         }
         generateBudgetSuggestion()
     }
@@ -94,36 +103,32 @@ class MainViewModel @Inject constructor(
                 val gId = doc.getString("groupId")
                 _groupId.value = gId
                 sharedPrefs.edit().putString("group_id", gId).apply()
-                gId?.let { startFirestoreSync(it) }
+                startFirestoreSync(gId, userId)
+            }
+            .addOnFailureListener {
+                // If user doc doesn't exist, still sync personal data
+                startFirestoreSync(null, userId)
             }
     }
 
-    fun setGuestMode(isGuest: Boolean) {
-        _isGuest.value = isGuest
-        _isAuthenticated.value = isGuest
-        sharedPrefs.edit().putBoolean("is_guest", isGuest).putBoolean("is_logged_in", isGuest).apply()
+    fun setGuestMode(value: Boolean) {
+        _isGuest.value = value
+        sharedPrefs.edit().putBoolean("is_guest", value).apply()
+        if (value) {
+            auth.signOut()
+            stopFirestoreSync()
+        }
     }
 
     fun signInWithEmail(email: String, pass: String) {
         viewModelScope.launch {
             _isAuthLoading.value = true
             _authError.value = null
-            // Simulate New Local Authentication with Secure Storage
             try {
-                val storedEmail = sharedPrefs.getString("user_email", null)
-                val storedPass = sharedPrefs.getString("user_pass", null)
-                
-                if (email == storedEmail && pass == storedPass) {
-                    _isAuthenticated.value = true
-                    _isGuest.value = false
-                    sharedPrefs.edit().putBoolean("is_logged_in", true).apply()
-                    val uid = sharedPrefs.getString("user_id", "local_user") ?: "local_user"
-                    loadUserGroup(uid)
-                } else {
-                    _authError.value = "Invalid email or password"
-                }
+                auth.signInWithEmailAndPassword(email, pass).await()
+                setGuestMode(false)
             } catch (e: Exception) {
-                _authError.value = e.message ?: "Authentication failed"
+                _authError.value = e.localizedMessage ?: "Authentication failed"
             } finally {
                 _isAuthLoading.value = false
             }
@@ -135,21 +140,10 @@ class MainViewModel @Inject constructor(
             _isAuthLoading.value = true
             _authError.value = null
             try {
-                val userId = UUID.randomUUID().toString()
-                sharedPrefs.edit()
-                    .putString("user_email", email)
-                    .putString("user_pass", pass)
-                    .putString("user_id", userId)
-                    .putBoolean("is_logged_in", true)
-                    .apply()
-                
-                val profile = mapOf("name" to "", "currency" to "₹", "budget" to 0.0, "incomeRange" to "Medium")
-                firestore.collection("users").document(userId).set(profile)
-                
-                _isAuthenticated.value = true
-                _isGuest.value = false
+                auth.createUserWithEmailAndPassword(email, pass).await()
+                setGuestMode(false)
             } catch (e: Exception) {
-                _authError.value = e.message ?: "Sign up failed"
+                _authError.value = e.localizedMessage ?: "Signup failed"
             } finally {
                 _isAuthLoading.value = false
             }
@@ -160,20 +154,12 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             _isAuthLoading.value = true
             _authError.value = null
-            // In the new system, we treat Google Sign-In as a quick local profile creation
             try {
-                val userId = "google_" + idToken.take(10)
-                sharedPrefs.edit()
-                    .putString("user_id", userId)
-                    .putBoolean("is_logged_in", true)
-                    .putBoolean("is_guest", false)
-                    .apply()
-                
-                _isAuthenticated.value = true
-                _isGuest.value = false
-                loadUserGroup(userId)
+                val credential = GoogleAuthProvider.getCredential(idToken, null)
+                auth.signInWithCredential(credential).await()
+                setGuestMode(false)
             } catch (e: Exception) {
-                _authError.value = "Google login simulation failed"
+                _authError.value = e.localizedMessage ?: "Google Login failed"
             } finally {
                 _isAuthLoading.value = false
             }
@@ -185,54 +171,53 @@ class MainViewModel @Inject constructor(
     }
 
     fun createGroup() {
-        val userId = sharedPrefs.getString("user_id", "local_user") ?: "local_user"
+        val userId = auth.currentUser?.uid ?: return
         val newGroupId = UUID.randomUUID().toString().substring(0, 8).uppercase()
         viewModelScope.launch {
             firestore.collection("users").document(userId).update("groupId", newGroupId)
                 .addOnSuccessListener {
                     _groupId.value = newGroupId
                     sharedPrefs.edit().putString("group_id", newGroupId).apply()
-                    startFirestoreSync(newGroupId)
+                    startFirestoreSync(newGroupId, userId)
                 }
         }
     }
 
     fun joinGroup(id: String) {
-        val userId = sharedPrefs.getString("user_id", "local_user") ?: "local_user"
+        val userId = auth.currentUser?.uid ?: return
         viewModelScope.launch {
             firestore.collection("users").document(userId).update("groupId", id)
                 .addOnSuccessListener {
                     _groupId.value = id
                     sharedPrefs.edit().putString("group_id", id).apply()
-                    startFirestoreSync(id)
+                    startFirestoreSync(id, userId)
                 }
         }
     }
 
     fun leaveGroup() {
-        val userId = sharedPrefs.getString("user_id", "local_user") ?: "local_user"
+        val userId = auth.currentUser?.uid ?: return
         viewModelScope.launch {
             firestore.collection("users").document(userId).update("groupId", null)
                 .addOnSuccessListener {
                     _groupId.value = null
                     sharedPrefs.edit().remove("group_id").apply()
-                    firestoreListener?.remove()
+                    startFirestoreSync(null, userId)
                 }
         }
     }
 
     fun logout() {
         viewModelScope.launch {
+            auth.signOut()
             repository.clearAllData()
             sharedPrefs.edit()
-                .putBoolean("is_logged_in", false)
                 .putBoolean("is_guest", false)
                 .remove("group_id")
                 .apply()
-            _isAuthenticated.value = false
             _isGuest.value = false
             _groupId.value = null
-            firestoreListener?.remove()
+            stopFirestoreSync()
         }
     }
 
@@ -247,71 +232,83 @@ class MainViewModel @Inject constructor(
     fun addOrUpdateExpense(id: Int = 0, amount: Double, category: String, note: String, paymentMethod: String, date: Long? = null) {
         viewModelScope.launch {
             val finalCategory = if(category == "Auto" || category.isEmpty()) smartInsights.predictCategory(note) else category
+            
+            // Generate a unique firebaseId if it's a new entry
+            val existingExpense = allExpenses.value.find { it.id == id }
+            val fId = existingExpense?.firebaseId ?: UUID.randomUUID().toString()
+            
             val expense = ExpenseEntity(
                 id = id,
                 amount = amount,
                 category = finalCategory,
                 date = date ?: System.currentTimeMillis(),
                 note = note,
-                paymentMethod = paymentMethod
+                paymentMethod = paymentMethod,
+                firebaseId = fId
             )
             repository.addExpense(expense)
-            if (!isGuest.value) syncExpenseToFirebase(expense)
+            if (!_isGuest.value) syncExpenseToFirebase(expense)
         }
     }
 
     private fun syncExpenseToFirebase(expense: ExpenseEntity) {
-        val userId = sharedPrefs.getString("user_id", null) ?: return
+        val userId = auth.currentUser?.uid ?: return
         val targetId = _groupId.value ?: userId
         val collectionPath = if (_groupId.value != null) "groups" else "users"
+        
         firestore.collection(collectionPath).document(targetId)
-            .collection("expenses").document(expense.id.toString()).set(expense)
+            .collection("expenses").document(expense.firebaseId ?: expense.id.toString()).set(expense)
     }
 
     fun deleteExpense(expense: ExpenseEntity) {
         viewModelScope.launch {
             repository.deleteExpense(expense)
-            if (!isGuest.value) {
-                val userId = sharedPrefs.getString("user_id", null) ?: return@launch
+            if (!_isGuest.value) {
+                val userId = auth.currentUser?.uid ?: return@launch
                 val targetId = _groupId.value ?: userId
                 val collectionPath = if (_groupId.value != null) "groups" else "users"
                 firestore.collection(collectionPath).document(targetId)
-                    .collection("expenses").document(expense.id.toString()).delete()
+                    .collection("expenses").document(expense.firebaseId ?: expense.id.toString()).delete()
             }
         }
     }
 
     fun addOrUpdateIncome(id: Int = 0, amount: Double, source: String, note: String, date: Long? = null) {
         viewModelScope.launch {
+            val existingIncome = allIncomes.value.find { it.id == id }
+            val fId = existingIncome?.firebaseId ?: UUID.randomUUID().toString()
+
             val income = IncomeEntity(
                 id = id,
                 amount = amount,
                 date = date ?: System.currentTimeMillis(),
                 source = source,
-                note = note
+                note = note,
+                firebaseId = fId
             )
             repository.addIncome(income)
-            if (!isGuest.value) syncIncomeToFirebase(income)
+            if (!_isGuest.value) syncIncomeToFirebase(income)
         }
     }
 
     private fun syncIncomeToFirebase(income: IncomeEntity) {
-        val userId = sharedPrefs.getString("user_id", null) ?: return
+        val userId = auth.currentUser?.uid ?: return
         val targetId = _groupId.value ?: userId
         val collectionPath = if (_groupId.value != null) "groups" else "users"
+        
         firestore.collection(collectionPath).document(targetId)
-            .collection("incomes").document(income.id.toString()).set(income)
+            .collection("incomes").document(income.firebaseId ?: income.id.toString()).set(income)
     }
 
     fun deleteIncome(income: IncomeEntity) {
         viewModelScope.launch {
             repository.deleteIncome(income)
-            if (!isGuest.value) {
-                val userId = sharedPrefs.getString("user_id", null) ?: return@launch
+            if (!_isGuest.value) {
+                val userId = auth.currentUser?.uid ?: return@launch
                 val targetId = _groupId.value ?: userId
                 val collectionPath = if (_groupId.value != null) "groups" else "users"
                 firestore.collection(collectionPath).document(targetId)
-                    .collection("incomes").document(income.id.toString()).delete()
+                    .collection("incomes").document(income.firebaseId ?: income.id.toString()).delete()
             }
         }
     }
@@ -321,8 +318,8 @@ class MainViewModel @Inject constructor(
             repository.updateUserProfile(UserEntity(id = 1, name = name, currencySymbol = currency, incomeRange = incomeRange))
             repository.setBudget(BudgetEntity(month = currentMonthYear, limitAmount = budgetLimit))
             
-            if (!isGuest.value) {
-                val userId = sharedPrefs.getString("user_id", null) ?: return@launch
+            if (!_isGuest.value) {
+                val userId = auth.currentUser?.uid ?: return@launch
                 val profile = mapOf("name" to name, "currency" to currency, "budget" to budgetLimit, "incomeRange" to incomeRange)
                 firestore.collection("users").document(userId).set(profile, com.google.firebase.firestore.SetOptions.merge())
             }
@@ -347,29 +344,77 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun startFirestoreSync(groupId: String) {
-        firestoreListener?.remove()
+    private fun startFirestoreSync(groupId: String?, userId: String) {
+        stopFirestoreSync()
         
-        firestoreListener = firestore.collection("groups").document(groupId)
+        val targetId = groupId ?: userId
+        val collectionPath = if (groupId != null) "groups" else "users"
+
+        // Expenses Sync
+        expensesListener = firestore.collection(collectionPath).document(targetId)
             .collection("expenses")
-            .orderBy("date", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshots, e ->
-                if (e != null) return@addSnapshotListener
+                if (e != null) {
+                    Log.e("MainViewModel", "Expenses listener failed", e)
+                    return@addSnapshotListener
+                }
                 
                 viewModelScope.launch {
-                    snapshots?.documents?.forEach { doc ->
-                        val expense = doc.toObject(ExpenseEntity::class.java)
-                        if (expense != null) {
-                            repository.addExpense(expense)
+                    snapshots?.documentChanges?.forEach { dc ->
+                        val expense = dc.document.toObject(ExpenseEntity::class.java)
+                        when (dc.type) {
+                            DocumentChange.Type.ADDED, DocumentChange.Type.MODIFIED -> {
+                                val existing = allExpenses.value.find { it.firebaseId == expense.firebaseId }
+                                repository.addExpense(expense.copy(id = existing?.id ?: 0))
+                            }
+                            DocumentChange.Type.REMOVED -> {
+                                allExpenses.value.find { it.firebaseId == expense.firebaseId }?.let {
+                                    repository.deleteExpense(it)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+        // Incomes Sync
+        incomesListener = firestore.collection(collectionPath).document(targetId)
+            .collection("incomes")
+            .addSnapshotListener { snapshots, e ->
+                if (e != null) {
+                    Log.e("MainViewModel", "Incomes listener failed", e)
+                    return@addSnapshotListener
+                }
+
+                viewModelScope.launch {
+                    snapshots?.documentChanges?.forEach { dc ->
+                        val income = dc.document.toObject(IncomeEntity::class.java)
+                        when (dc.type) {
+                            DocumentChange.Type.ADDED, DocumentChange.Type.MODIFIED -> {
+                                val existing = allIncomes.value.find { it.firebaseId == income.firebaseId }
+                                repository.addIncome(income.copy(id = existing?.id ?: 0))
+                            }
+                            DocumentChange.Type.REMOVED -> {
+                                allIncomes.value.find { it.firebaseId == income.firebaseId }?.let {
+                                    repository.deleteIncome(it)
+                                }
+                            }
                         }
                     }
                 }
             }
     }
 
+    private fun stopFirestoreSync() {
+        expensesListener?.remove()
+        incomesListener?.remove()
+        expensesListener = null
+        incomesListener = null
+    }
+
     override fun onCleared() {
         super.onCleared()
-        firestoreListener?.remove()
+        stopFirestoreSync()
     }
 }
 

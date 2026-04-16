@@ -28,20 +28,10 @@ android {
     buildTypes {
         debug {
             buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"394951768057-87s8g7209cdfbphldtmj1gmjl5godrdh.apps.googleusercontent.com\"")
-            packaging {
-                jniLibs {
-                    useLegacyPackaging = true
-                }
-            }
         }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            packaging {
-                jniLibs {
-                    useLegacyPackaging = true
-                }
-            }
         }
     }
     
@@ -63,13 +53,11 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
-        jniLibs {
-            useLegacyPackaging = true
-        }
     }
 }
 
 dependencies {
+    implementation("com.google.firebase:firebase-firestore:26.2.0")
     val composeBom = platform("androidx.compose:compose-bom:2024.02.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)

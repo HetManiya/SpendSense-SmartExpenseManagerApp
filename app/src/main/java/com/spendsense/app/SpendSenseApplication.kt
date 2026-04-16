@@ -4,7 +4,6 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.*
 import com.google.firebase.FirebaseApp
-import com.google.firebase.FirebaseOptions
 import com.spendsense.app.backend.worker.BudgetCheckWorker
 import dagger.hilt.android.HiltAndroidApp
 import java.util.concurrent.TimeUnit
@@ -24,18 +23,18 @@ class SpendSenseApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         
-        // Load SQLCipher library explicitly
-        System.loadLibrary("sqlcipher")
+        // Manual loading of SQLCipher native library to prevent UnsatisfiedLinkError
+        try {
+            System.loadLibrary("sqlcipher")
+        } catch (e: UnsatisfiedLinkError) {
+            // Log the error if the library couldn't be loaded
+            e.printStackTrace()
+        }
         
         // Initialize Firebase with a safety check
         try {
             if (FirebaseApp.getApps(this).isEmpty()) {
-                val options = FirebaseOptions.Builder()
-                    .setApplicationId("com.spendsense.app")
-                    .setApiKey("dummy_api_key")
-                    .setProjectId("spendsense-app")
-                    .build()
-                FirebaseApp.initializeApp(this, options)
+                FirebaseApp.initializeApp(this)
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -46,7 +45,7 @@ class SpendSenseApplication : Application(), Configuration.Provider {
 
     private fun setupBackgroundWorkers() {
         val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+            .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
         val budgetCheckRequest = PeriodicWorkRequestBuilder<BudgetCheckWorker>(4, TimeUnit.HOURS)

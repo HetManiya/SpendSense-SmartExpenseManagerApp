@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.Flow
 interface SpendSenseDao {
     // Expense
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertExpense(expense: ExpenseEntity)
+    suspend fun insertExpense(expense: ExpenseEntity): Long
 
     @Update
     suspend fun updateExpense(expense: ExpenseEntity)
@@ -23,7 +23,7 @@ interface SpendSenseDao {
 
     // Income
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertIncome(income: IncomeEntity)
+    suspend fun insertIncome(income: IncomeEntity): Long
 
     @Update
     suspend fun updateIncome(income: IncomeEntity)
@@ -59,7 +59,7 @@ interface SpendSenseDao {
 
     // Goals
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertGoal(goal: GoalEntity)
+    suspend fun insertGoal(goal: GoalEntity): Long
 
     @Query("SELECT * FROM goals ORDER BY deadline ASC")
     fun getAllGoals(): Flow<List<GoalEntity>>

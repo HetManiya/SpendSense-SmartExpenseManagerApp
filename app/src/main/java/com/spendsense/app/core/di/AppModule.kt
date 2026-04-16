@@ -2,13 +2,13 @@ package com.spendsense.app.core.di
 
 import android.content.Context
 import android.content.SharedPreferences
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.spendsense.app.backend.local.SpendSenseDao
 import com.spendsense.app.backend.local.SpendSenseDatabase
 import com.spendsense.app.backend.repository.FinanceRepository
 import com.spendsense.app.backend.repository.SmartInsightsRepository
+import com.spendsense.app.core.util.SecurityUtils
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -33,8 +33,12 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideFinanceRepository(dao: SpendSenseDao): FinanceRepository {
-        return FinanceRepository(dao)
+    fun provideFinanceRepository(
+        dao: SpendSenseDao,
+        firestore: FirebaseFirestore,
+        auth: FirebaseAuth
+    ): FinanceRepository {
+        return FinanceRepository(dao, firestore, auth)
     }
 
     @Provides
@@ -45,18 +49,14 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideEncryptedSharedPreferences(@ApplicationContext context: Context): SharedPreferences {
-        val masterKey = MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
+    fun provideSharedPreferences(@ApplicationContext context: Context): SharedPreferences {
+        return SecurityUtils.getEncryptedPrefs(context)
+    }
 
-        return EncryptedSharedPreferences.create(
-            context,
-            "spendsense_secure_prefs",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
+    @Provides
+    @Singleton
+    fun provideFirebaseAuth(): FirebaseAuth {
+        return FirebaseAuth.getInstance()
     }
 
     @Provides
